@@ -2,8 +2,8 @@ use crate::foc::EDir;
 use crate::foc::MAX_MOTOR_NR;
 use crate::EFocSimpleError;
 use crate::Result;
+use defmt::info;
 use fixed::types::I16F16;
-use rtt_target::rprintln;
 
 // lookup table from the raw hall state (1-3-2-6-4-5  as index to get the hall state )
 //                                  0  1  2  3  4  5  6  7
@@ -25,7 +25,7 @@ impl FocHallSensor {
     let hall_idx_max = nr_poles * 6;
     let angle_per_state = I16F16::TAU / hall_idx_max as i32;
     if motor_nr >= MAX_MOTOR_NR {
-      rprintln!("Incorrect motor number. Panic now");
+      info!("Incorrect motor number. Panic now");
       panic!();
     }
     FocHallSensor {
@@ -54,7 +54,7 @@ impl FocHallSensor {
   pub fn update(&mut self, raw_state: usize) -> Result<I16F16> {
     if raw_state == 0 || raw_state > 6 {
       self.error_count += 1;
-      rprintln!("Error Invalid hall state {}", raw_state,);
+      info!("Error Invalid hall state {}", raw_state,);
       Err(EFocSimpleError::AngleSensorError)
     } else {
       let prev = self.state_prev;
@@ -70,7 +70,7 @@ impl FocHallSensor {
             }
             self.dir = EDir::Cw;
           } else if prev != 1 {
-            rprintln!("Error change new:{} old:{}", state, prev);
+            info!("Error change new:{} old:{}", state, prev);
             self.error_count += 1
           }
         }
@@ -82,13 +82,13 @@ impl FocHallSensor {
               self.hall_idx_base -= 6;
             }
           } else if prev != 4 {
-            rprintln!("Error change new:{} old:{}", state, prev);
+            info!("Error change new:{} old:{}", state, prev);
             self.error_count += 1
           }
         }
         _ => {
           if state.abs_diff(prev) != 1 {
-            rprintln!("Error change new:{} old:{}", state, prev);
+            info!("Error change new:{} old:{}", state, prev);
             self.error_count += 1
           }
         }

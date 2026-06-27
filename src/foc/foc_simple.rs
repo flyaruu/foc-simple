@@ -1,5 +1,5 @@
+use defmt::info;
 use fixed::types::I16F16;
-use rtt_target::rprintln;
 
 use crate::{
   foc::{EDir, EFocMode},
@@ -114,7 +114,7 @@ impl FocSimple {
   }
 
   pub fn set_foc_mode(&mut self, mode: EFocMode) -> Result<()> {
-    rprintln!("Set Foc mode");
+    info!("Set Foc mode");
     self.foc_mode = mode;
     match self.foc_mode {
       EFocMode::Calibration(param) => match param {
@@ -267,7 +267,7 @@ impl FocSimple {
   fn do_calibration(&mut self) -> Result<(I16F16, I16F16)> {
     let req = self.shaft_position_req;
     let act = self.shaft_position_act;
-
+    info!("Starting calibration state: {:?} {:?}", req.get_angle().to_num::<f32>(), act.get_angle().to_num::<f32>());
     match self.calibration_state {
       ECalibrateState::Init => {
         self.shaft_position_req.reset();
@@ -282,15 +282,15 @@ impl FocSimple {
           if act.rotations == 0 && act.angle == I16F16::ZERO {
             self.calibration_state = ECalibrateState::Init;
             self.foc_mode = EFocMode::Error(EFocSimpleError::NoMotorMovement);
-            rprintln!("End condition No motor movement detected");
+            info!("End condition No motor movement detected");
           } else {
             // set the direction
             if act.get_position() < 0 {
               // reverse the direction in the driver. Motor must run in the same dir as the sensor
-              rprintln!("Direction inversed");
+              info!("Direction inversed");
               self.shaft_position_act.set_inversed(true);
             } else {
-              rprintln!("Direction not inversed");
+              info!("Direction not inversed");
               self.shaft_position_act.set_inversed(false);
             }
 
@@ -309,7 +309,7 @@ impl FocSimple {
           // normalize to 0 .. TAU
           self.electrical_offset = ShaftPosition::clamp(offset);
           self.calibration_state = ECalibrateState::ReturnToStart;
-          rprintln!("Electrical offset:{}", self.electrical_offset);
+          info!("Electrical offset:{}", self.electrical_offset);
         } else {
           // rotate with 10 rad/sec positive
           self.shaft_position_req.inc(I16F16::from_num(0.01));
@@ -319,7 +319,7 @@ impl FocSimple {
         // end conditions at start positon plu TAU/2
         if req.rotations == 0 && req.angle < I16F16::FRAC_TAU_2 {
           self.foc_mode = EFocMode::Idle;
-          rprintln!("Calibraton finished");
+          info!("Calibraton finished");
         } else {
           // rotate with 10 rad/sec negative
           self.shaft_position_req.inc(I16F16::from_num(-0.01));

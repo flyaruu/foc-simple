@@ -1,10 +1,11 @@
 use crate::foc::COMMAND_CHANNEL_SIZE;
 use crate::foc::MAX_MOTOR_NR;
+use defmt::debug;
+use defmt::info;
 use embassy_futures::select::{select4, Either4};
 use embassy_sync::{blocking_mutex::raw::CriticalSectionRawMutex, channel::Channel, signal::Signal};
 use embassy_time::{Instant, Ticker};
 use fixed::types::I16F16;
-use rtt_target::rprintln;
 
 use crate::{
   foc::{foc_pwm::FocPwm, foc_simple::FocSimple, PwmDriver},
@@ -65,9 +66,9 @@ where
   }
 
   pub async fn task(&mut self) {
-    rprintln!("Start foc update task");
+    info!("Start foc update task");
     if self.motor_nr >= MAX_MOTOR_NR {
-      rprintln!("Incorrect motor number {}. Aborting", self.motor_nr);
+      info!("Incorrect motor number {}. Aborting", self.motor_nr);
       return;
     }
 
@@ -86,7 +87,7 @@ where
             EFocAngleSensor::SensorLess => EFocAngle::SensorLess,
             EFocAngleSensor::ShaftSensor(s) => match s.get_angle() {
               Err(_) => {
-                rprintln!("Error while getting shaft angle");
+                info!("Error while getting shaft angle");
                 // reuse previous value
                 EFocAngle::SensorValue(self.foc.get_position_act().get_angle())
               }
@@ -95,7 +96,10 @@ where
             EFocAngleSensor::HallSensor => EFocAngle::SensorValue(self.hall_angle),
           };
           match self.foc.update(angle) {
-            Ok((angle, torque)) => _ = self.foc_pwm.update(angle, torque, None),
+            Ok((angle, torque)) => {
+              // info!("Foc update successful: {} {}", angle.to_num::<f32>(), torque.to_num::<f32>());
+               _ = self.foc_pwm.update(angle, torque, None).unwrap()
+            },
             Err(_e) => {
               self.error_count += 1
               // handle error
@@ -106,17 +110,21 @@ where
           let now = Instant::now().as_millis() as usize;
           self.foc.update_velocity(now);
         }
-        Either4::Fourth(command) => match command {
-          EFocCommand::FocMode(mode) => _ = self.foc.set_foc_mode(mode),
-          EFocCommand::ShaftPosition(shaft_pos) => _ = self.foc.set_position_req(shaft_pos),
-          EFocCommand::Speed(speed) => self.foc.set_speed(speed),
-          EFocCommand::SpeedAcc(acc) => self.foc.set_acceleration(acc),
-          EFocCommand::Torque(t) => self.foc.set_torque(t),
-          EFocCommand::Angle(a) => self.foc.set_angle(a),
-          EFocCommand::TorqueLimit(tl) => _ = self.foc_pwm.set_torque_limit(tl),
-          EFocCommand::ErrorCount => {
-            rprintln!("Total error count:{}", self.error_count);
-            self.error_count = 0
+        Either4::Fourth(command) => 
+        {
+          info!("Received command: {:?}", defmt::Debug2Format(&command));
+          match command {
+            EFocCommand::FocMode(mode) => _ = self.foc.set_foc_mode(mode),
+            EFocCommand::ShaftPosition(shaft_pos) => _ = self.foc.set_position_req(shaft_pos),
+            EFocCommand::Speed(speed) => self.foc.set_speed(speed),
+            EFocCommand::SpeedAcc(acc) => self.foc.set_acceleration(acc),
+            EFocCommand::Torque(t) => self.foc.set_torque(t),
+            EFocCommand::Angle(a) => self.foc.set_angle(a),
+            EFocCommand::TorqueLimit(tl) => _ = self.foc_pwm.set_torque_limit(tl),
+            EFocCommand::ErrorCount => {
+              info!("Total error count:{}", self.error_count);
+              self.error_count = 0
+            }
           }
         },
       }
@@ -129,7 +137,7 @@ impl FocSimpleCommand {
   pub fn send_command(idx: usize, command: EFocCommand) {
     if idx < MAX_MOTOR_NR {
       if let Err(_e) = CHANNEL_COMMANDS[idx].try_send(command) {
-        rprintln!("Command channel full for motor {}", idx);
+        info!("Command channel full for motor {}", idx);
       }
     }
   }

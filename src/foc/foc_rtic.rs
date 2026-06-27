@@ -87,7 +87,7 @@ where
             EFocAngleSensor::SensorLess => EFocAngle::SensorLess,
             EFocAngleSensor::ShaftSensor(s) => match s.get_angle() {
               Err(_) => {
-                rprintln!("Error while getting shaft angle");
+                info!("Error while getting shaft angle");
                 // reuse previous value
                 EFocAngle::SensorValue(self.foc.get_position_act().get_angle())
               }

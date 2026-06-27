@@ -1,3 +1,4 @@
+use defmt::info;
 #[allow(dead_code)]
 use fixed::types::I16F16;
 use foc::park_clarke::{self, TwoPhaseReferenceFrame};
